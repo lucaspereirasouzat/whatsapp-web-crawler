@@ -179,7 +179,7 @@ function extractContactsFromPage() {
             const trimmedName = name.trim();
             if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
               contacts.push({
-                id: `contact_${index}_${extractionTimestamp}_${Math.random().toString(36).slice(2, 11)}`,
+                id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2).padEnd(9, '0')}`,
                 name: trimmedName,
                 lastMessage: lastMessage.substring(0, 50).trim(),
                 avatar: avatar
@@ -465,10 +465,11 @@ async function sendMessageToContact(contactName, message) {
     if (!sendButton) {
       const sendIcon = document.querySelector('span[data-icon="send"]');
       if (sendIcon) {
-        // Use parentElement to get the immediate button parent instead of closest
-        sendButton = sendIcon.parentElement;
-        // Verify it's actually a button
-        if (sendButton && sendButton.tagName !== 'BUTTON') {
+        // Try to find the button - first check immediate parent, then traverse up
+        const parentElement = sendIcon.parentElement;
+        if (parentElement && parentElement.tagName === 'BUTTON') {
+          sendButton = parentElement;
+        } else {
           sendButton = sendIcon.closest('button');
         }
       }

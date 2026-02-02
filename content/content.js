@@ -102,7 +102,7 @@ function extractContacts() {
         const trimmedName = name.trim();
         if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
           contacts.push({
-            id: `contact_${index}_${extractionTimestamp}_${Math.random().toString(36).slice(2, 11)}`,
+            id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2).padEnd(9, '0')}`,
             name: trimmedName,
             lastMessage: lastMessage.substring(0, 50).trim(),
             avatar: avatar
