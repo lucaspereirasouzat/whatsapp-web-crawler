@@ -62,6 +62,7 @@ async function extractContacts() {
       func: extractContactsFromPage
     });
 
+    // The function now returns a Promise, so we await the result
     const extractedContacts = results[0].result;
 
     if (extractedContacts && extractedContacts.length > 0) {
@@ -72,7 +73,8 @@ async function extractContacts() {
       messageSection.style.display = 'block';
       addLog(`✅ ${contacts.length} contatos extraídos com sucesso!`, 'success');
     } else {
-      addLog('⚠️ Nenhum contato encontrado. Certifique-se de que o WhatsApp está carregado.', 'warning');
+      addLog('⚠️ Nenhum contato encontrado. Certifique-se de que o WhatsApp está totalmente carregado e que você possui conversas na lista.', 'warning');
+      addLog('💡 Dica: Role a lista de conversas para baixo e tente novamente.', 'info');
     }
 
   } catch (error) {
@@ -86,64 +88,126 @@ async function extractContacts() {
 
 // Função injetada na página para extrair contatos
 function extractContactsFromPage() {
-  const contacts = [];
-  
-  try {
-    // Aguardar um pouco para garantir que a página está carregada
-    const chatList = document.querySelector('div[data-testid="chat-list"]') || 
-                     document.querySelector('#pane-side');
+  return new Promise((resolve) => {
+    const contacts = [];
     
-    if (!chatList) {
-      return contacts;
+    // Função para tentar extrair com retry
+    function attemptExtraction(retriesLeft = 5) {
+      try {
+        // Tentar múltiplos seletores para encontrar a lista de chats
+        const chatList = document.querySelector('div[data-testid="chat-list"]') || 
+                         document.querySelector('#pane-side') ||
+                         document.querySelector('[aria-label*="lista"]') ||
+                         document.querySelector('[aria-label*="Lista"]') ||
+                         document.querySelector('div[role="navigation"]');
+        
+        if (!chatList) {
+          if (retriesLeft > 0) {
+            console.log(`Lista de chats não encontrada. Tentando novamente... (${retriesLeft} tentativas restantes)`);
+            setTimeout(() => attemptExtraction(retriesLeft - 1), 1000);
+            return;
+          } else {
+            console.error('Lista de chats não encontrada após múltiplas tentativas');
+            resolve(contacts);
+            return;
+          }
+        }
+
+        // Seletores atualizados e mais robustos para WhatsApp Web
+        let contactElements = chatList.querySelectorAll('div[role="listitem"]');
+        
+        // Fallback: tentar outros seletores se não encontrar listitems
+        if (contactElements.length === 0) {
+          contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+        }
+        if (contactElements.length === 0) {
+          contactElements = chatList.querySelectorAll('div[class*="chat"]');
+        }
+
+        if (contactElements.length === 0) {
+          if (retriesLeft > 0) {
+            console.log(`Nenhum contato encontrado ainda. Tentando novamente... (${retriesLeft} tentativas restantes)`);
+            setTimeout(() => attemptExtraction(retriesLeft - 1), 1000);
+            return;
+          } else {
+            console.error('Nenhum elemento de contato encontrado após múltiplas tentativas');
+            resolve(contacts);
+            return;
+          }
+        }
+
+        console.log(`Encontrados ${contactElements.length} elementos de contato`);
+
+        // Usar timestamp único para esta extração
+        const extractionTimestamp = Date.now();
+
+        contactElements.forEach((element, index) => {
+          try {
+            // Extrair nome do contato com múltiplos fallbacks
+            let name = '';
+            const nameElement = element.querySelector('span[dir="auto"][title]') || 
+                               element.querySelector('span[title]') ||
+                               element.querySelector('[data-testid="conversation-info-header-chat-title"]') ||
+                               element.querySelector('span[dir="auto"]');
+            
+            if (nameElement) {
+              name = nameElement.getAttribute('title') || nameElement.textContent || '';
+            }
+
+            // Extrair última mensagem (opcional)
+            let lastMessage = '';
+            const messageElements = element.querySelectorAll('span[dir="ltr"], span[dir="auto"]');
+            if (messageElements.length > 1) {
+              // Filtrar para não pegar o nome novamente
+              for (let i = messageElements.length - 1; i >= 0; i--) {
+                const text = messageElements[i].textContent || '';
+                if (text && text.trim() !== name.trim() && text.length > 0) {
+                  lastMessage = text;
+                  break;
+                }
+              }
+            }
+
+            // Extrair avatar (opcional)
+            let avatar = '';
+            const avatarElement = element.querySelector('img[src]');
+            if (avatarElement && avatarElement.src) {
+              avatar = avatarElement.src;
+            }
+
+            // Adicionar apenas se tiver nome válido e não for "WhatsApp"
+            const trimmedName = name.trim();
+            if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
+              contacts.push({
+                // ID format: contact_{timestamp}_{index}_{9-char-random}
+                // slice(2,11) extracts 9 characters (positions 2-10), padEnd ensures exactly 9 chars
+                id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2, 11).padEnd(9, '0')}`,
+                name: trimmedName,
+                lastMessage: lastMessage.substring(0, 50).trim(),
+                avatar: avatar
+              });
+            }
+          } catch (err) {
+            console.error('Erro ao processar contato:', err);
+          }
+        });
+
+        console.log(`Extraídos ${contacts.length} contatos válidos`);
+        resolve(contacts);
+
+      } catch (error) {
+        console.error('Erro na extração:', error);
+        if (retriesLeft > 0) {
+          setTimeout(() => attemptExtraction(retriesLeft - 1), 1000);
+        } else {
+          resolve(contacts);
+        }
+      }
     }
 
-    // Seletores atualizados para WhatsApp Web 2026
-    const contactElements = chatList.querySelectorAll('div[role="listitem"]');
-
-    contactElements.forEach((element, index) => {
-      try {
-        // Extrair nome do contato
-        let name = '';
-        const nameElement = element.querySelector('span[dir="auto"][title]') || 
-                           element.querySelector('span[title]');
-        
-        if (nameElement) {
-          name = nameElement.getAttribute('title') || nameElement.textContent;
-        }
-
-        // Extrair última mensagem (opcional)
-        let lastMessage = '';
-        const messageElements = element.querySelectorAll('span[dir="ltr"], span[dir="auto"]');
-        if (messageElements.length > 1) {
-          lastMessage = messageElements[messageElements.length - 1].textContent || '';
-        }
-
-        // Extrair avatar (opcional)
-        let avatar = '';
-        const avatarElement = element.querySelector('img[src]');
-        if (avatarElement) {
-          avatar = avatarElement.src;
-        }
-
-        // Adicionar apenas se tiver nome
-        if (name && name.trim() !== '') {
-          contacts.push({
-            id: `contact_${index}_${Date.now()}`,
-            name: name.trim(),
-            lastMessage: lastMessage.substring(0, 50),
-            avatar: avatar
-          });
-        }
-      } catch (err) {
-        console.error('Erro ao processar contato:', err);
-      }
-    });
-
-  } catch (error) {
-    console.error('Erro na extração:', error);
-  }
-
-  return contacts;
+    // Iniciar extração
+    attemptExtraction();
+  });
 }
 
 // Renderizar lista de contatos
@@ -326,22 +390,36 @@ async function sendMessages() {
 async function sendMessageToContact(contactName, message) {
   try {
     // Encontrar e clicar no contato
+    // Tentar múltiplos seletores para encontrar a lista de chats
     const chatList = document.querySelector('div[data-testid="chat-list"]') || 
-                     document.querySelector('#pane-side');
+                     document.querySelector('#pane-side') ||
+                     document.querySelector('[aria-label*="lista"]') ||
+                     document.querySelector('[aria-label*="Lista"]') ||
+                     document.querySelector('div[role="navigation"]');
     
     if (!chatList) {
       return { success: false, error: 'Lista de contatos não encontrada' };
     }
 
-    const contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    // Tentar múltiplos seletores para encontrar contatos
+    let contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+    }
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[class*="chat"]');
+    }
+    
     let foundContact = false;
 
     for (const element of contactElements) {
       const nameElement = element.querySelector('span[dir="auto"][title]') || 
-                         element.querySelector('span[title]');
+                         element.querySelector('span[title]') ||
+                         element.querySelector('[data-testid="conversation-info-header-chat-title"]') ||
+                         element.querySelector('span[dir="auto"]');
       
       if (nameElement) {
-        const name = nameElement.getAttribute('title') || nameElement.textContent;
+        const name = nameElement.getAttribute('title') || nameElement.textContent || '';
         if (name.trim() === contactName.trim()) {
           element.click();
           foundContact = true;
@@ -357,9 +435,11 @@ async function sendMessageToContact(contactName, message) {
     // Aguardar chat abrir
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    // Encontrar campo de mensagem
+    // Encontrar campo de mensagem com múltiplos seletores
     const messageBox = document.querySelector('div[contenteditable="true"][data-tab="10"]') ||
-                      document.querySelector('div[contenteditable="true"]');
+                      document.querySelector('div[contenteditable="true"][data-tab="6"]') ||
+                      document.querySelector('div[contenteditable="true"]') ||
+                      document.querySelector('div[role="textbox"]');
 
     if (!messageBox) {
       return { success: false, error: 'Campo de mensagem não encontrado' };
@@ -381,9 +461,26 @@ async function sendMessageToContact(contactName, message) {
     // Aguardar mensagem ser digitada
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    // Encontrar e clicar no botão de enviar
-    const sendButton = document.querySelector('button[data-testid="send"]') ||
-                      document.querySelector('span[data-icon="send"]')?.parentElement;
+    // Encontrar e clicar no botão de enviar com múltiplos seletores
+    let sendButton = document.querySelector('button[data-testid="send"]');
+    
+    if (!sendButton) {
+      const sendIcon = document.querySelector('span[data-icon="send"]');
+      if (sendIcon) {
+        // Try to find the button - first check immediate parent, then traverse up
+        const parentElement = sendIcon.parentElement;
+        if (parentElement && parentElement.tagName === 'BUTTON') {
+          sendButton = parentElement;
+        } else {
+          sendButton = sendIcon.closest('button');
+        }
+      }
+    }
+    
+    if (!sendButton) {
+      sendButton = document.querySelector('button[aria-label*="Send"]') ||
+                  document.querySelector('button[aria-label*="Enviar"]');
+    }
 
     if (!sendButton) {
       return { success: false, error: 'Botão de enviar não encontrado' };

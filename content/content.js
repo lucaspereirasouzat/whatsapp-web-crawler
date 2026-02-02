@@ -36,38 +36,59 @@ function extractContacts() {
   const contacts = [];
   
   try {
+    // Tentar múltiplos seletores para encontrar a lista de chats
     const chatList = document.querySelector('div[data-testid="chat-list"]') || 
-                     document.querySelector('#pane-side');
+                     document.querySelector('#pane-side') ||
+                     document.querySelector('[aria-label*="lista"]') ||
+                     document.querySelector('[aria-label*="Lista"]') ||
+                     document.querySelector('div[role="navigation"]');
     
     if (!chatList) {
       console.error('Lista de contatos não encontrada');
       return contacts;
     }
 
-    // Seletores atualizados para WhatsApp Web 2026
-    const contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    // Seletores atualizados e mais robustos para WhatsApp Web
+    let contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    
+    // Fallback: tentar outros seletores se não encontrar listitems
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+    }
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[class*="chat"]');
+    }
+    
     console.log(`Encontrados ${contactElements.length} elementos de contato`);
+
+    // Usar timestamp único para esta extração
+    const extractionTimestamp = Date.now();
 
     contactElements.forEach((element, index) => {
       try {
-        // Extrair nome do contato
+        // Extrair nome do contato com múltiplos fallbacks
         let name = '';
         const nameElement = element.querySelector('span[dir="auto"][title]') || 
                            element.querySelector('span[title]') ||
+                           element.querySelector('[data-testid="conversation-info-header-chat-title"]') ||
                            element.querySelector('span[dir="auto"]');
         
         if (nameElement) {
-          name = nameElement.getAttribute('title') || nameElement.textContent;
+          name = nameElement.getAttribute('title') || nameElement.textContent || '';
         }
 
         // Extrair última mensagem (opcional)
         let lastMessage = '';
         const messageElements = element.querySelectorAll('span[dir="ltr"], span[dir="auto"]');
         if (messageElements.length > 1) {
-          lastMessage = Array.from(messageElements)
-            .map(el => el.textContent)
-            .filter(text => text && text.trim() !== name)
-            .join(' ');
+          // Filtrar para não pegar o nome novamente
+          for (let i = messageElements.length - 1; i >= 0; i--) {
+            const text = messageElements[i].textContent || '';
+            if (text && text.trim() !== name.trim() && text.length > 0) {
+              lastMessage = text;
+              break;
+            }
+          }
         }
 
         // Extrair avatar (opcional)
@@ -77,11 +98,14 @@ function extractContacts() {
           avatar = avatarElement.src;
         }
 
-        // Adicionar apenas se tiver nome válido
-        if (name && name.trim() !== '' && !name.includes('WhatsApp')) {
+        // Adicionar apenas se tiver nome válido e não for "WhatsApp"
+        const trimmedName = name.trim();
+        if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
           contacts.push({
-            id: `contact_${index}_${Date.now()}`,
-            name: name.trim(),
+            // ID format: contact_{timestamp}_{index}_{9-char-random}
+            // slice(2,11) extracts 9 characters (positions 2-10), padEnd ensures exactly 9 chars
+            id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2, 11).padEnd(9, '0')}`,
+            name: trimmedName,
             lastMessage: lastMessage.substring(0, 50).trim(),
             avatar: avatar
           });
@@ -102,22 +126,35 @@ function extractContacts() {
 // Encontrar contato pelo nome
 function findContactByName(contactName) {
   try {
+    // Tentar múltiplos seletores para encontrar a lista de chats
     const chatList = document.querySelector('div[data-testid="chat-list"]') || 
-                     document.querySelector('#pane-side');
+                     document.querySelector('#pane-side') ||
+                     document.querySelector('[aria-label*="lista"]') ||
+                     document.querySelector('[aria-label*="Lista"]') ||
+                     document.querySelector('div[role="navigation"]');
     
     if (!chatList) {
       console.error('Lista de contatos não encontrada');
       return null;
     }
 
-    const contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    // Tentar múltiplos seletores para encontrar contatos
+    let contactElements = chatList.querySelectorAll('div[role="listitem"]');
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+    }
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[class*="chat"]');
+    }
 
     for (const element of contactElements) {
       const nameElement = element.querySelector('span[dir="auto"][title]') || 
-                         element.querySelector('span[title]');
+                         element.querySelector('span[title]') ||
+                         element.querySelector('[data-testid="conversation-info-header-chat-title"]') ||
+                         element.querySelector('span[dir="auto"]');
       
       if (nameElement) {
-        const name = nameElement.getAttribute('title') || nameElement.textContent;
+        const name = nameElement.getAttribute('title') || nameElement.textContent || '';
         if (name.trim().toLowerCase() === contactName.trim().toLowerCase()) {
           return element;
         }
