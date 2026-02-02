@@ -47,7 +47,8 @@ async function extractContacts() {
     // Obter tab ativa
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-    if (!tab.url.includes('web.whatsapp.com')) {
+    // Validação segura do hostname do WhatsApp Web
+    if (!tab.url || !tab.url.startsWith('https://web.whatsapp.com/')) {
       addLog('❌ Erro: Você precisa estar no WhatsApp Web!', 'error');
       alert('Por favor, abra o WhatsApp Web primeiro!');
       extractBtn.disabled = false;
