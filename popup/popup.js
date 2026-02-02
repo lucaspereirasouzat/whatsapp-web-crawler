@@ -62,7 +62,7 @@ async function extractContacts() {
       func: extractContactsFromPage
     });
 
-    // A função agora retorna uma Promise, então esperamos o resultado
+    // The function now returns a Promise, so we await the result
     const extractedContacts = results[0].result;
 
     if (extractedContacts && extractedContacts.length > 0) {
@@ -180,7 +180,7 @@ function extractContactsFromPage() {
             if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
               contacts.push({
                 // ID format: contact_{timestamp}_{index}_{9-char-random}
-                // slice(2,11) takes chars 2-10 (9 chars), padEnd ensures exactly 9 chars for edge cases
+                // slice(2,11) extracts 9 characters (positions 2-10), padEnd ensures exactly 9 chars
                 id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2, 11).padEnd(9, '0')}`,
                 name: trimmedName,
                 lastMessage: lastMessage.substring(0, 50).trim(),
