@@ -94,7 +94,7 @@ function extractContacts() {
         // Extrair avatar (opcional)
         let avatar = '';
         const avatarElement = element.querySelector('img[src]');
-        if (avatarElement && avatarElement.src && !avatarElement.src.includes('blob:')) {
+        if (avatarElement && avatarElement.src && !avatarElement.src.startsWith('blob:')) {
           avatar = avatarElement.src;
         }
 
@@ -102,7 +102,7 @@ function extractContacts() {
         const trimmedName = name.trim();
         if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
           contacts.push({
-            id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2).padEnd(9, '0')}`,
+            id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2, 11).padEnd(9, '0')}`,
             name: trimmedName,
             lastMessage: lastMessage.substring(0, 50).trim(),
             avatar: avatar
