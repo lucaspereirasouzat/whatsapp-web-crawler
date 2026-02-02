@@ -119,7 +119,6 @@ function extractContactsFromPage() {
         // Fallback: tentar outros seletores se não encontrar listitems
         if (contactElements.length === 0) {
           contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]') ||
-                           chatList.querySelectorAll('div._8nE1Y') ||
                            chatList.querySelectorAll('div[class*="chat"]');
         }
 
@@ -173,12 +172,9 @@ function extractContactsFromPage() {
 
             // Adicionar apenas se tiver nome válido e não for "WhatsApp"
             const trimmedName = name.trim();
-            if (trimmedName && 
-                trimmedName !== '' && 
-                !trimmedName.toLowerCase().includes('whatsapp') &&
-                trimmedName.length > 0) {
+            if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
               contacts.push({
-                id: `contact_${index}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                id: `contact_${index}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
                 name: trimmedName,
                 lastMessage: lastMessage.substring(0, 50).trim(),
                 avatar: avatar
@@ -402,7 +398,6 @@ async function sendMessageToContact(contactName, message) {
     let contactElements = chatList.querySelectorAll('div[role="listitem"]');
     if (contactElements.length === 0) {
       contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]') ||
-                       chatList.querySelectorAll('div._8nE1Y') ||
                        chatList.querySelectorAll('div[class*="chat"]');
     }
     
@@ -463,7 +458,12 @@ async function sendMessageToContact(contactName, message) {
     if (!sendButton) {
       const sendIcon = document.querySelector('span[data-icon="send"]');
       if (sendIcon) {
-        sendButton = sendIcon.closest('button');
+        // Use parentElement to get the immediate button parent instead of closest
+        sendButton = sendIcon.parentElement;
+        // Verify it's actually a button
+        if (sendButton && sendButton.tagName !== 'BUTTON') {
+          sendButton = sendIcon.closest('button');
+        }
       }
     }
     
