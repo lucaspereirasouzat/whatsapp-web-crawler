@@ -53,11 +53,16 @@ function extractContacts() {
     
     // Fallback: tentar outros seletores se não encontrar listitems
     if (contactElements.length === 0) {
-      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]') ||
-                       chatList.querySelectorAll('div[class*="chat"]');
+      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+    }
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[class*="chat"]');
     }
     
     console.log(`Encontrados ${contactElements.length} elementos de contato`);
+
+    // Usar timestamp único para esta extração
+    const extractionTimestamp = Date.now();
 
     contactElements.forEach((element, index) => {
       try {
@@ -97,7 +102,7 @@ function extractContacts() {
         const trimmedName = name.trim();
         if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
           contacts.push({
-            id: `contact_${index}_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+            id: `contact_${index}_${extractionTimestamp}_${Math.random().toString(36).slice(2, 11)}`,
             name: trimmedName,
             lastMessage: lastMessage.substring(0, 50).trim(),
             avatar: avatar
@@ -134,8 +139,10 @@ function findContactByName(contactName) {
     // Tentar múltiplos seletores para encontrar contatos
     let contactElements = chatList.querySelectorAll('div[role="listitem"]');
     if (contactElements.length === 0) {
-      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]') ||
-                       chatList.querySelectorAll('div[class*="chat"]');
+      contactElements = chatList.querySelectorAll('div[data-testid^="cell-frame-container"]');
+    }
+    if (contactElements.length === 0) {
+      contactElements = chatList.querySelectorAll('div[class*="chat"]');
     }
 
     for (const element of contactElements) {
