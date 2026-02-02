@@ -171,7 +171,7 @@ function extractContactsFromPage() {
             // Extrair avatar (opcional)
             let avatar = '';
             const avatarElement = element.querySelector('img[src]');
-            if (avatarElement && avatarElement.src && !avatarElement.src.startsWith('blob:')) {
+            if (avatarElement && avatarElement.src) {
               avatar = avatarElement.src;
             }
 
@@ -179,6 +179,8 @@ function extractContactsFromPage() {
             const trimmedName = name.trim();
             if (trimmedName && !trimmedName.toLowerCase().includes('whatsapp')) {
               contacts.push({
+                // ID format: contact_{timestamp}_{index}_{9-char-random}
+                // slice(2,11) takes chars 2-10 (9 chars), padEnd ensures exactly 9 chars for edge cases
                 id: `contact_${extractionTimestamp}_${index}_${Math.random().toString(36).slice(2, 11).padEnd(9, '0')}`,
                 name: trimmedName,
                 lastMessage: lastMessage.substring(0, 50).trim(),
